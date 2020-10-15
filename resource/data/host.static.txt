@@ -1,0 +1,9 @@
+
+# type:
+# {ip} {domain1} {domain2} ...
+# example:
+# 127.0.0.1 *test.lan
+# 127.0.0.1 test.lan www.test.lan
+
+# 127.0.0.1 test.lan www.test.lan
+# 127.0.0.2 *test1.**.lan* # aaa

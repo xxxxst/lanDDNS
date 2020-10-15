@@ -1,0 +1,7 @@
+
+# type:
+# {mac} {domain1} {domain2} ...
+# example:
+# 10-10-10-10-10-10 *test.lan
+# 10-10-10-10-10-10 test.lan www.test.lan
+
