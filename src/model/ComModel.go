@@ -72,6 +72,7 @@ func CreateComConfig() (*ComConfig) {
 			UseStaticHost: true,
 			UseDynamicHost: true,
 			UseMacHost: true,
+			MacIp: "",
 		},
 
 		ComClient: ComConfigComClient {

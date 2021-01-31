@@ -22,19 +22,27 @@ import (
 )
 
 type MacArpListenServer struct {
-	
+	mapAllowIp map[uint32] uint32;
+	mapMacToIp map[string] uint32;
+	mapIpToMac map[uint32] string;
 }
 
 var insMacArpListenServer *MacArpListenServer = nil;
 
 func GetMacArpListenServer() *MacArpListenServer {
 	if(insMacArpListenServer == nil) {
-		insMacArpListenServer = &MacArpListenServer{};
+		ins := &MacArpListenServer{};
+		ins.mapAllowIp = make(map[uint32] uint32);
+		ins.mapMacToIp = make(map[string] uint32);
+		insMacArpListenServer = ins;
+
 	}
 	return insMacArpListenServer
 }
 
 func (c *MacArpListenServer) Run() {
+	c.initConfig();
+
 	arr := c.findIfaces();
 	if(len(arr) == 0) {
 		return;
@@ -55,6 +63,66 @@ func (c *MacArpListenServer) Run() {
 	// go func() {
 	// 	wg.Wait();
 	// }();
+}
+
+func (c *MacArpListenServer) initConfig() {
+	md := GetComModel();
+	strIp := md.ConfigMd.Server.MacIp;
+	arr := strings.Split(strIp, ",");
+
+	// reg := regexp.MustCompile("^([0-9]+\\.[0-9]+\\.[0-9]+).*")
+
+	mapIp := map[uint32] uint32{};
+	for i:=0; i < len(arr); i++ {
+		// arr[i] = reg.ReplaceAllString(arr[i], "$1");
+		arr[i] = strings.Trim(arr[i], " \t");
+		ip := net.ParseIP(arr[i]);
+		if(ip == nil) {
+			continue;
+		}
+		ip = ip.To4();
+		if(ip == nil) {
+			continue;
+		}
+		numIp := binary.BigEndian.Uint32(ip);
+		numIp = numIp & 0xffffff00;
+		mapIp[numIp] = 0;
+	}
+
+	c.mapAllowIp = mapIp;
+}
+
+func (c *MacArpListenServer) getIp(arrIp *[]byte) uint32 {
+	if(len(*arrIp) != 4) {
+		return 0;
+	}
+	ip := binary.BigEndian.Uint32(*arrIp);
+	return ip;
+}
+
+func (c *MacArpListenServer) checkAllowIp(arrIp *[]byte) (bool, uint32) {
+	ip := c.getIp(arrIp);
+	seg := ip & 0xffffff00;
+	_,ok := c.mapAllowIp[seg];
+	return ok,ip;
+}
+
+func (c *MacArpListenServer) delIpMac(ip uint32, mac string) {
+	if val,ok := c.mapMacToIp[mac]; ok {
+		delete(c.mapIpToMac, val);
+		delete(c.mapMacToIp, mac);
+	}
+	if val, ok := c.mapIpToMac[ip]; ok {
+		delete(c.mapMacToIp, val);
+		delete(c.mapIpToMac, ip);
+	}
+}
+
+func (c *MacArpListenServer) setIpMac(ip uint32, mac string) {
+	c.delIpMac(ip, mac);
+	
+	c.mapMacToIp[mac] = ip;
+	c.mapIpToMac[ip] = mac;
 }
 
 func (c *MacArpListenServer) listen(iface *pcap.Interface) {
@@ -87,7 +155,35 @@ func (c *MacArpListenServer) listen(iface *pcap.Interface) {
 			// Note:  we might get some packets here that aren't responses to ones we've sent,
 			// if for example someone else sends US an ARP request.  Doesn't much matter, though...
 			// all information is good information :)
-			fmt.Printf("%v, %v, %v\n", arp.Operation != layers.ARPReply, net.IP(arp.SourceProtAddress), net.HardwareAddr(arp.SourceHwAddress))
+			// ok := false;
+			// ip := uint32(0);
+			// var arrMac []byte = nil;
+			// if(arp.Operation == layers.ARPReply) {
+			// 	ok,ip = c.checkAllowIp(&arp.SourceProtAddress);
+			// 	arrMac = arp.SourceHwAddress;
+			// 	// if(ok) {
+			// 	// 	fmt.Printf("-%v, %v, %v\n", arp.Operation != layers.ARPReply, net.IP(arp.SourceProtAddress), net.HardwareAddr(arp.SourceHwAddress));
+			// 	// }
+			// } else {
+			// 	ok,ip = c.checkAllowIp(&arp.DstProtAddress);
+			// 	arrMac = arp.DstHwAddress;
+			// 	// if(ok) {
+			// 	// 	fmt.Printf(".%v, %v, %v\n", arp.Operation != layers.ARPReply, net.IP(arp.DstProtAddress), net.HardwareAddr(arp.DstHwAddress));
+			// 	// }
+			// }
+			ok,ip := c.checkAllowIp(&arp.SourceProtAddress);
+			if(!ok) {
+				continue;
+			}
+			// arrMac = arp.SourceHwAddress;
+			strMac := net.HardwareAddr(arp.SourceHwAddress).String();
+
+			c.setIpMac(ip, strMac);
+
+			aaa := make(net.IP, 4);
+			binary.BigEndian.PutUint32(aaa, ip)
+			fmt.Printf("-%v, %v, %v\n", arp.Operation == layers.ARPReply, aaa, strMac);
+			// fmt.Printf("%v, %v, %v\n", arp.Operation != layers.ARPReply, net.IP(arp.SourceProtAddress), net.HardwareAddr(arp.SourceHwAddress))
 			continue;
 		}
 	}
