@@ -57,13 +57,14 @@ func (c *DomainMatch) SetTemplate(ip string, domainTmpl string) {
 
 	// arr := strings.Split(domainTmpl, "*");
 	arr := strings.FieldsFunc(domainTmpl, funSplit);
-	if(len(arr) <=1 ) {
+	// fmt.Println("aaa:", len(arr), arr);
+	c.fuzzyFirst = (domainTmpl[0] == '*');
+	c.fuzzyLast = (domainTmpl[len(domainTmpl)-1] == '*');
+	if(!c.fuzzyFirst && !c.fuzzyLast && len(arr) <=1 ) {
 		return;
 	}
 
 	c.isFuzzyMatch = true;
-	c.fuzzyFirst = (domainTmpl[0] == '*');
-	c.fuzzyLast = (domainTmpl[len(domainTmpl)-1] == '*');
 
 	c.arrUrl = arr;
 	// fmt.Println(len(arr), arr);

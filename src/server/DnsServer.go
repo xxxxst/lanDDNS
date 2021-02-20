@@ -2,7 +2,7 @@
 package server
 
 import (
-	"fmt"
+	// "fmt"
 	"net"
 	// "regexp"
 
@@ -90,8 +90,8 @@ func (c *DnsServer) WriteTypeA(w dns.ResponseWriter, r *dns.Msg, addr string) {
 	var dnsRR []dns.RR;
 	// for _, address := range addresses {
 	rr := new(dns.A);
-	fmt.Println(name);
-	fmt.Println(c);
+	// fmt.Println(name);
+	// fmt.Println(c);
 	rr.Hdr = dns.RR_Header{ Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: c.ttl };
 	rr.A = net.ParseIP(addr);
 	dnsRR = append(dnsRR, rr);
@@ -161,7 +161,7 @@ func (c *DnsServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	}
 	name := r.Question[0].Name;
 	qtype := r.Question[0].Qtype;
-	fmt.Println("aaa:", name, qtype);
+	// fmt.Println("aaa:", name, qtype);
 
 	// 对于A记录解析请求
 	// if qtype == dns.TypeA {
@@ -244,13 +244,13 @@ func (c *DnsServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 func (c *DnsServer) ListenAsync(port string) error {
 	err := c.logicListenAsync(port, true);
 	if(err != nil) {
-		fmt.Println("ListenAsync err: ", err);
+		// fmt.Println("ListenAsync err: ", err);
 		return err;
 	}
 
 	err = c.logicListenAsync(port, false);
 	if(err != nil) {
-		fmt.Println("ListenAsync err: ", err);
+		// fmt.Println("ListenAsync err: ", err);
 		return err;
 	}
 
@@ -299,6 +299,7 @@ func (c *DnsServer) runListenAsync(l *net.TCPListener, p *net.UDPConn) {
 	err := server.ActivateAndServe()
 
 	if(err != nil) {
-		fmt.Println("runListenAsync err: ", err);
+		// fmt.Println("runListenAsync err: ", err);
+		return;
 	}
 }

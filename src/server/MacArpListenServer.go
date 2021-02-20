@@ -16,7 +16,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 
-	// . "control"
+	. "control"
 	. "model"
 	// util "util"
 )
@@ -36,8 +36,9 @@ type IpData struct {
 
 type MacArpListenServer struct {
 	mapAllowIp map[uint32] uint32;
-	mapMacToIp map[string] uint32;
-	mapIpToMac map[uint32] string;
+	// mapMacToIp map[string] uint32;
+	// mapIpToMac map[uint32] string;
+	mapMacIp *OMMap;
 
 	chIpData chan IpData;
 }
@@ -48,8 +49,9 @@ func GetMacArpListenServer() *MacArpListenServer {
 	if(insMacArpListenServer == nil) {
 		ins := &MacArpListenServer{};
 		ins.mapAllowIp = make(map[uint32] uint32);
-		ins.mapMacToIp = make(map[string] uint32);
-		ins.mapIpToMac = make(map[uint32] string);
+		// ins.mapMacToIp = make(map[string] uint32);
+		// ins.mapIpToMac = make(map[uint32] string);
+		ins.mapMacIp = CreateOMMap();
 
 		ins.chIpData = make(chan IpData, 10);
 
@@ -85,7 +87,7 @@ func (c *MacArpListenServer) Run() {
 		go c.listen(*md);
 	}
 
-	// go c.SendArpData(arr);
+	go c.SendArpData(arr);
 }
 
 func (c *MacArpListenServer) initConfig() {
@@ -130,16 +132,16 @@ func (c *MacArpListenServer) checkAllowIp(arrIp *[]byte) (bool, uint32) {
 	return ok,ip;
 }
 
-func (c *MacArpListenServer) delIpMac(ip uint32, mac string) {
-	if val,ok := c.mapMacToIp[mac]; ok {
-		delete(c.mapIpToMac, val);
-		delete(c.mapMacToIp, mac);
-	}
-	if val, ok := c.mapIpToMac[ip]; ok {
-		delete(c.mapMacToIp, val);
-		delete(c.mapIpToMac, ip);
-	}
-}
+// func (c *MacArpListenServer) delIpMac(ip uint32, mac string) {
+// 	if val,ok := c.mapMacToIp[mac]; ok {
+// 		delete(c.mapIpToMac, val);
+// 		delete(c.mapMacToIp, mac);
+// 	}
+// 	if val, ok := c.mapIpToMac[ip]; ok {
+// 		delete(c.mapMacToIp, val);
+// 		delete(c.mapIpToMac, ip);
+// 	}
+// }
 
 func boolCvt(ok bool) string {
 	if(ok){
@@ -164,20 +166,30 @@ func (c *MacArpListenServer) goSetIpMac() {
 }
 
 func (c *MacArpListenServer) setIpMac(ip uint32, mac string) {
-	ipTmp, ok := c.mapMacToIp[mac];
-	// fmt.Println("111:" + boolCvt(ok) + "," + boolCvt(ipTmp==ip) , len(c.mapMacToIp));
-	if(ok && ipTmp==ip) {
-		return;
-	}
-
-	c.delIpMac(ip, mac);
-	
 	a := make(net.IP, 4);
-	binary.BigEndian.PutUint32(a, ip)
-	fmt.Println("save:" + net.IP(a).String() + "," + mac);
+	binary.BigEndian.PutUint32(a, ip);
+	strIp := net.IP(a).String();
 
-	c.mapMacToIp[mac] = ip;
-	c.mapIpToMac[ip] = mac;
+	// oldIp := c.mapMacIp.GetVal(mac);
+	// if(oldIp == nil || oldIp.(uint32) != ip) {
+	// 	fmt.Println("save:" + strIp + "," + mac);
+	// }
+
+	c.mapMacIp.Add(mac, ip);
+	
+	mainCtl := GetMainCtl();
+	mainCtl.DomainMacCtl.SetMacIp(mac, strIp);
+
+	// ipTmp, ok := c.mapMacToIp[mac];
+	// if(ok && ipTmp==ip) {
+	// 	return;
+	// }
+
+	// c.delIpMac(ip, mac);
+	// c.mapMacIp.Add(mac, ip);
+
+	// c.mapMacToIp[mac] = ip;
+	// c.mapIpToMac[ip] = mac;
 }
 
 func (c *MacArpListenServer) checkSaveIp(bIp *[]byte, bMac *[]byte) {
@@ -185,7 +197,7 @@ func (c *MacArpListenServer) checkSaveIp(bIp *[]byte, bMac *[]byte) {
 	if(!ok) {
 		return;
 	}
-	strMac := net.HardwareAddr(*bMac).String();
+	strMac := strings.ToLower(net.HardwareAddr(*bMac).String());
 	// c.setIpMac(ip, strMac);
 
 	ipData := IpData{
@@ -246,16 +258,15 @@ func (c *MacArpListenServer) listen(md IfaceMd) {
 			// 	// }
 			// }
 
-			fmt.Printf("%v, %v, %v\n", arp.Operation == layers.ARPRequest, net.IP(arp.SourceProtAddress), net.HardwareAddr(arp.SourceHwAddress));
-			fmt.Printf("%v, %v, %v\n", arp.Operation == layers.ARPRequest, net.IP(arp.DstProtAddress), net.HardwareAddr(arp.DstHwAddress));
-			fmt.Printf("----\n");
+			// fmt.Printf("%v, %v, %v\n", arp.Operation == layers.ARPRequest, net.IP(arp.SourceProtAddress), net.HardwareAddr(arp.SourceHwAddress));
+			// fmt.Printf("%v, %v, %v\n", arp.Operation == layers.ARPRequest, net.IP(arp.DstProtAddress), net.HardwareAddr(arp.DstHwAddress));
+			// fmt.Printf("----\n");
 			
 			if(arp.Operation == layers.ARPReply) {
 				c.checkSaveIp(&arp.SourceProtAddress, &arp.SourceHwAddress);
 				c.checkSaveIp(&arp.DstProtAddress, &arp.DstHwAddress);
-			// } else if(arp.Operation == layers.ARPRequest) {
-			// 	// fmt.Println("ccc");
-			// 	c.checkSaveIp(&arp.SourceProtAddress, &arp.SourceHwAddress);
+			} else if(arp.Operation == layers.ARPRequest) {
+				c.checkSaveIp(&arp.SourceProtAddress, &arp.SourceHwAddress);
 			}
 			// ok,ip := c.checkAllowIp(&arp.SourceProtAddress);
 			// if(!ok) {
@@ -314,6 +325,8 @@ func (c *MacArpListenServer) writeARP(md IfaceMd) {
 		if err := md.Handle.WritePacketData(buf.Bytes()); err != nil {
 			return;
 		}
+
+		// time.Sleep(1 * time.Millisecond);
 	}
 	return;
 }
@@ -349,8 +362,9 @@ func (c *MacArpListenServer) findIfaces() []IfaceMd {
 			continue;
 		}
 		numIp := binary.BigEndian.Uint32(ip);
-		numIp = numIp & 0xffffff00;
-		mapIp[numIp] = 0;
+		netIp := numIp & 0xffffff00;
+		mapIp[netIp] = 0;
+		// fmt.Println("--" + ip.String(), numIp);
 	}
 	
 	rst := []IfaceMd{};
@@ -374,6 +388,7 @@ func (c *MacArpListenServer) findIfaces() []IfaceMd {
 			numIp := binary.BigEndian.Uint32(ip);
 			netIp := numIp & 0xffffff00;
 			_,ok = mapIp[netIp];
+			// fmt.Println("##" + ip.String(), numIp, arr, netIface);
 			if(ok) {
 				mapNetIface[numIp] = netIface;
 				break;
@@ -411,6 +426,7 @@ func (c *MacArpListenServer) findIfaces() []IfaceMd {
 			}
 			numIp := binary.BigEndian.Uint32(ip);
 			netIp := numIp & 0xffffff00;
+			// fmt.Println("" + ip.String() + "," + i.Name, i.Addresses, numIp, addrs);
 
 			netIface,ok := mapNetIface[numIp];
 			if(!ok) {
@@ -429,7 +445,7 @@ func (c *MacArpListenServer) findIfaces() []IfaceMd {
 				};
 				rst = append(rst, md);
 
-				// fmt.Println("" + ip.String() + "," + i.Name, i.Addresses);
+				// fmt.Println("" + ip.String() + "," + i.Name, i.Addresses, i);
 				break;
 			}
 

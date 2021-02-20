@@ -83,7 +83,7 @@ func (c *ConfigListenServer) watch(path string, fileName string, cb func()) {
 	ch := make(chan notify.EventInfo, 1);
 	err := notify.Watch(path, ch, notify.Create, notify.Write);
 	if(err != nil) {
-		fmt.Println(err);
+		// fmt.Println(err);
 		return;
 	}
 

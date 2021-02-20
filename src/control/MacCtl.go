@@ -35,6 +35,7 @@ func (c *MacCtl) SetMacIp(mac string, ip string) {
 
 func (c *MacCtl) UpdateGroup(group *DomainGroup) {
 	c.DomainMacGroup = group;
+	// fmt.Println("update");
 
 	arrDelMac := []string{};
 	for key := range c.MapMacToIp {
@@ -47,19 +48,21 @@ func (c *MacCtl) UpdateGroup(group *DomainGroup) {
 			continue;
 		}
 	}
-	for i:=0; i < len(arrDelMac); i++ {
-		delete(c.MapMacToIp, arrDelMac[i]);
-	}
+	// for i:=0; i < len(arrDelMac); i++ {
+	// 	delete(c.MapMacToIp, arrDelMac[i]);
+	// }
 	// delete(c.MapDomainToMac, domain);
 }
 
 func (c *MacCtl) Test(domain string) string {
 	mac := c.DomainMacGroup.Test(domain);
+	// fmt.Println("aaa", mac);
 	if(mac == "") {
 		return "";
 	}
 
 	ip, ok := c.MapMacToIp[mac];
+	// fmt.Println("bbb", ip, ok);
 	if(ok) {
 		return ip;
 	}

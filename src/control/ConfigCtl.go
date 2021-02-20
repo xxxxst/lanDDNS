@@ -87,7 +87,7 @@ func (c *ConfigCtl) formatHost(text string) *DomainGroup {
 			continue;
 		}
 		// fmt.Println("rst: ", len(arr2), arr2);
-		strIp := arr2[0];
+		strIp := strings.ToLower(arr2[0]);
 		for j:=1; j < len(arr2); j++ {
 			domain := arr2[j];
 			group.AddDomainTmpl(strIp, domain);

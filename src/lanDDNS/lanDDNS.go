@@ -87,11 +87,11 @@ func (c *LanDDNS) Run() {
 	
 	comMd.ConfigMd = GetConfigCtl().LoadConfig(comMd.ConfigDir + "config.ini");
 
-	// GetConfigListenServer().Run();
+	GetConfigListenServer().Run();
 	GetMacArpListenServer().Run();
 
-	c.WaitExit();
-	return;
+	// c.WaitExit();
+	// return;
 
 	// GetDnsServer().Init();
 
@@ -166,10 +166,10 @@ func (c *LanDDNS) Run() {
 	fmt.Println("server start");
 	fmt.Println("----------------------------------");
 	
-	if(enableMngServer) {
-		time.Sleep(time.Second);
-		GetMsgServer().SendOnline();
-	}
+	// if(enableMngServer) {
+	// 	time.Sleep(time.Second);
+	// 	GetMsgServer().SendOnline();
+	// }
 
 	c.WaitExit();
 }
