@@ -36,7 +36,20 @@ func GetConfigCtl() *ConfigCtl {
 func (c *ConfigCtl) LoadConfig(path string) *ComConfig {
 	md := CreateComConfig();
 
-	ini.MapTo(md, path);
+	if(util.FileExists(path)) {
+		ini.MapTo(md, path);
+	} else {
+		cfg := ini.Empty();
+		cfg.ReflectFrom(md);
+		cfg.SaveTo(path);
+	}
+	// cfg, err := ini.Load(path);
+	// if(err == nil) {
+	// 	cfg.MapTo(md);
+	// } else {
+	// 	cfg.SaveTo(path);
+	// }
+
 	return md;
 }
 

@@ -39,19 +39,23 @@ func (c *ConfigListenServer) Run() {
 	c.updateHostStatic();
 	c.updateHostMac();
 
-	fmt.Println(mainCtl.DomainMacCtl.DomainMacGroup);
-	fmt.Println(mainCtl.DomainMacCtl.MapMacToIp);
+	// fmt.Println(mainCtl.DomainMacCtl.DomainMacGroup);
+	// fmt.Println(mainCtl.DomainMacCtl.MapMacToIp);
 
 	hostDynamicPath := md.ConfigDir + "host.dynamic.txt";
 	cfgCtl.SaveHostDynamic(hostDynamicPath, mainCtl.DomainGroupDynamic);
 
-	c.watch(md.ConfigDir, "host.static.txt", func() {
-		c.updateHostStatic();
-	});
+	if(md.ConfigMd.Server.UseStaticHost) {
+		c.watch(md.ConfigDir, "host.static.txt", func() {
+			c.updateHostStatic();
+		});
+	}
 
-	c.watch(md.ConfigDir, "host.mac.txt", func() {
-		c.updateHostMac();
-	});
+	if(md.ConfigMd.Server.MacIp != "") {
+		c.watch(md.ConfigDir, "host.mac.txt", func() {
+			c.updateHostMac();
+		});
+	}
 	
 	// md.ConfigMd = rst;
 }

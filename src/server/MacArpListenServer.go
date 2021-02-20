@@ -9,7 +9,7 @@ import (
 	// "regexp"
 	// "sync"
 	"strings"
-	// "time"
+	"time"
 	
 	// "github.com/rjeczalik/notify"
 	"github.com/google/gopacket"
@@ -21,10 +21,25 @@ import (
 	// util "util"
 )
 
+type IfaceMd struct {
+	Iface pcap.Interface;
+	NetIp uint32;
+	Ip net.IP;
+	HardwareAddr net.HardwareAddr;
+	Handle *pcap.Handle;
+}
+
+type IpData struct {
+	Ip uint32;
+	Mac string;
+}
+
 type MacArpListenServer struct {
 	mapAllowIp map[uint32] uint32;
 	mapMacToIp map[string] uint32;
 	mapIpToMac map[uint32] string;
+
+	chIpData chan IpData;
 }
 
 var insMacArpListenServer *MacArpListenServer = nil;
@@ -34,6 +49,10 @@ func GetMacArpListenServer() *MacArpListenServer {
 		ins := &MacArpListenServer{};
 		ins.mapAllowIp = make(map[uint32] uint32);
 		ins.mapMacToIp = make(map[string] uint32);
+		ins.mapIpToMac = make(map[uint32] string);
+
+		ins.chIpData = make(chan IpData, 10);
+
 		insMacArpListenServer = ins;
 
 	}
@@ -48,21 +67,25 @@ func (c *MacArpListenServer) Run() {
 		return;
 	}
 
-	// var wg sync.WaitGroup;
-	for _,iface := range arr {
-		go c.listen(&iface);
-		// wg.Add(1);
-		// go func(iface net.Interface) {
-		// 	defer wg.Done()
-		// 	if err := scan(&iface); err != nil {
-		// 		log.Printf("interface %v: %v", iface.Name, err)
-		// 	}
-		// }(iface)
+	go c.goSetIpMac();
+
+	for i:=0; i<len(arr); i++ {
+		md := &arr[i];
+
+		numIp := binary.BigEndian.Uint32(md.Ip);
+		c.setIpMac(numIp, md.HardwareAddr.String());
+
+		handle, err := pcap.OpenLive(md.Iface.Name, 65536, true, pcap.BlockForever);
+		if err != nil {
+			md.Handle = nil;
+			continue;
+		} else {
+			md.Handle = handle;
+		}
+		go c.listen(*md);
 	}
 
-	// go func() {
-	// 	wg.Wait();
-	// }();
+	// go c.SendArpData(arr);
 }
 
 func (c *MacArpListenServer) initConfig() {
@@ -118,23 +141,74 @@ func (c *MacArpListenServer) delIpMac(ip uint32, mac string) {
 	}
 }
 
+func boolCvt(ok bool) string {
+	if(ok){
+		return "true";
+	}else {
+		return "false";
+	}
+}
+
+func (c *MacArpListenServer) goSetIpMac() {
+	for {
+		select {
+		case ipData :=  <- c.chIpData: {
+			c.setIpMac(ipData.Ip, ipData.Mac);
+
+			continue;
+		}
+		}
+	}
+	// ip := <- chIp;
+	// mac := <- chMac;
+}
+
 func (c *MacArpListenServer) setIpMac(ip uint32, mac string) {
+	ipTmp, ok := c.mapMacToIp[mac];
+	// fmt.Println("111:" + boolCvt(ok) + "," + boolCvt(ipTmp==ip) , len(c.mapMacToIp));
+	if(ok && ipTmp==ip) {
+		return;
+	}
+
 	c.delIpMac(ip, mac);
 	
+	a := make(net.IP, 4);
+	binary.BigEndian.PutUint32(a, ip)
+	fmt.Println("save:" + net.IP(a).String() + "," + mac);
+
 	c.mapMacToIp[mac] = ip;
 	c.mapIpToMac[ip] = mac;
 }
 
-func (c *MacArpListenServer) listen(iface *pcap.Interface) {
-	fmt.Println(iface.Name);
-	handle, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever)
-	if err != nil {
-		fmt.Println("aaa", err);
+func (c *MacArpListenServer) checkSaveIp(bIp *[]byte, bMac *[]byte) {
+	ok,ip := c.checkAllowIp(bIp);
+	if(!ok) {
 		return;
 	}
-	defer handle.Close()
+	strMac := net.HardwareAddr(*bMac).String();
+	// c.setIpMac(ip, strMac);
 
-	src := gopacket.NewPacketSource(handle, layers.LayerTypeEthernet)
+	ipData := IpData{
+		Ip: ip,
+		Mac: strMac,
+	};
+
+	c.chIpData <- ipData;
+}
+
+func (c *MacArpListenServer) listen(md IfaceMd) {
+	// iface := md.Iface;
+
+	// handle, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever);
+	// if err != nil {
+	// 	fmt.Println("aaa", err);
+	// 	return;
+	// }
+	defer md.Handle.Close();
+
+	// fmt.Println(iface.Name, iface.Addresses, iface);
+
+	src := gopacket.NewPacketSource(md.Handle, layers.LayerTypeEthernet)
 	in := src.Packets()
 	for {
 		var packet gopacket.Packet
@@ -143,9 +217,9 @@ func (c *MacArpListenServer) listen(iface *pcap.Interface) {
 		// 	return;
 		// }
 		case packet = <-in:
-			arpLayer := packet.Layer(layers.LayerTypeARP)
+			arpLayer := packet.Layer(layers.LayerTypeARP);
 			if arpLayer == nil {
-				continue
+				continue;
 			}
 			arp := arpLayer.(*layers.ARP)
 			// if bytes.Equal([]byte(iface.HardwareAddr), arp.SourceHwAddress) {
@@ -171,25 +245,91 @@ func (c *MacArpListenServer) listen(iface *pcap.Interface) {
 			// 	// 	fmt.Printf(".%v, %v, %v\n", arp.Operation != layers.ARPReply, net.IP(arp.DstProtAddress), net.HardwareAddr(arp.DstHwAddress));
 			// 	// }
 			// }
-			ok,ip := c.checkAllowIp(&arp.SourceProtAddress);
-			if(!ok) {
-				continue;
+
+			fmt.Printf("%v, %v, %v\n", arp.Operation == layers.ARPRequest, net.IP(arp.SourceProtAddress), net.HardwareAddr(arp.SourceHwAddress));
+			fmt.Printf("%v, %v, %v\n", arp.Operation == layers.ARPRequest, net.IP(arp.DstProtAddress), net.HardwareAddr(arp.DstHwAddress));
+			fmt.Printf("----\n");
+			
+			if(arp.Operation == layers.ARPReply) {
+				c.checkSaveIp(&arp.SourceProtAddress, &arp.SourceHwAddress);
+				c.checkSaveIp(&arp.DstProtAddress, &arp.DstHwAddress);
+			// } else if(arp.Operation == layers.ARPRequest) {
+			// 	// fmt.Println("ccc");
+			// 	c.checkSaveIp(&arp.SourceProtAddress, &arp.SourceHwAddress);
 			}
-			// arrMac = arp.SourceHwAddress;
-			strMac := net.HardwareAddr(arp.SourceHwAddress).String();
+			// ok,ip := c.checkAllowIp(&arp.SourceProtAddress);
+			// if(!ok) {
+			// 	continue;
+			// }
+			// strMac := net.HardwareAddr(arp.SourceHwAddress).String();
 
-			c.setIpMac(ip, strMac);
+			// c.setIpMac(ip, strMac);
 
-			aaa := make(net.IP, 4);
-			binary.BigEndian.PutUint32(aaa, ip)
-			fmt.Printf("-%v, %v, %v\n", arp.Operation == layers.ARPReply, aaa, strMac);
-			// fmt.Printf("%v, %v, %v\n", arp.Operation != layers.ARPReply, net.IP(arp.SourceProtAddress), net.HardwareAddr(arp.SourceHwAddress))
+			// aaa := make(net.IP, 4);
+			// binary.BigEndian.PutUint32(aaa, ip)
+			// fmt.Printf("-%v, %v, %v\n", arp.Operation == layers.ARPReply, aaa, strMac);
 			continue;
 		}
 	}
 }
 
-func (c *MacArpListenServer) findIfaces() []pcap.Interface {
+func (c *MacArpListenServer) writeARP(md IfaceMd) {
+	// Set up all the layers' fields we can.
+	eth := layers.Ethernet{
+		SrcMAC:       md.HardwareAddr,
+		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		EthernetType: layers.EthernetTypeARP,
+	}
+	arp := layers.ARP{
+		AddrType:          layers.LinkTypeEthernet,
+		Protocol:          layers.EthernetTypeIPv4,
+		HwAddressSize:     6,
+		ProtAddressSize:   4,
+		Operation:         layers.ARPRequest,
+		SourceHwAddress:   []byte(md.HardwareAddr),
+		SourceProtAddress: []byte(md.Ip),
+		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
+	}
+	// Set up buffer and options for serialization.
+	buf := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}
+
+	numIp := binary.BigEndian.Uint32(md.Ip);
+
+	const maxIpCount int = 255;
+	// Send one packet for every address.
+	for i:=1; i < maxIpCount; i++ {
+		bIp2 := make(net.IP, 4);
+		testIp := md.NetIp + uint32(i);
+		if(testIp == numIp) {
+			continue;
+		}
+		binary.BigEndian.PutUint32(bIp2, testIp);
+
+		arp.DstProtAddress = bIp2;
+		gopacket.SerializeLayers(buf, opts, &eth, &arp)
+		if err := md.Handle.WritePacketData(buf.Bytes()); err != nil {
+			return;
+		}
+	}
+	return;
+}
+
+func (c *MacArpListenServer) SendArpData(arr []IfaceMd) {
+	time.Sleep(time.Duration(100)*time.Millisecond);
+	
+	for i:=0; i < len(arr); i++ {
+		if(arr[i].Handle == nil) {
+			continue;
+		}
+		c.writeARP(arr[i]);
+	}
+}
+
+func (c *MacArpListenServer) findIfaces() []IfaceMd {
 	md := GetComModel();
 	strIp := md.ConfigMd.Server.MacIp;
 	arr := strings.Split(strIp, ",");
@@ -213,9 +353,34 @@ func (c *MacArpListenServer) findIfaces() []pcap.Interface {
 		mapIp[numIp] = 0;
 	}
 	
-	rst := []pcap.Interface{};
+	rst := []IfaceMd{};
 
-	// ifaces, _ := net.Interfaces();
+	mapNetIface := make(map[uint32] net.Interface);
+	arrNetIfaces, _ := net.Interfaces();
+	for i:=0; i < len(arrNetIfaces); i++ {
+		netIface := arrNetIfaces[i];
+
+		arr, _ := netIface.Addrs();
+		for j:=0; j<len(arr); j++ {
+			addr,ok := arr[j].(*net.IPNet);
+			if(!ok){
+				continue;
+			}
+			ip := addr.IP.To4();
+			if(ip == nil) {
+				continue;
+			}
+			
+			numIp := binary.BigEndian.Uint32(ip);
+			netIp := numIp & 0xffffff00;
+			_,ok = mapIp[netIp];
+			if(ok) {
+				mapNetIface[numIp] = netIface;
+				break;
+			}
+		}
+	}
+
 	ifaces, err := pcap.FindAllDevs();
 	if(err != nil) {
 		return rst;
@@ -245,12 +410,26 @@ func (c *MacArpListenServer) findIfaces() []pcap.Interface {
 				continue;
 			}
 			numIp := binary.BigEndian.Uint32(ip);
-			numIp = numIp & 0xffffff00;
-			_,ok := mapIp[numIp];
+			netIp := numIp & 0xffffff00;
+
+			netIface,ok := mapNetIface[numIp];
+			if(!ok) {
+				continue;
+			}
+
+			_,ok = mapIp[netIp];
 			if(ok) {
 				// str := ip.String();
 				// fmt.Println(str);
-				rst = append(rst, i);
+				md := IfaceMd{
+					Iface: i,
+					NetIp: netIp,
+					HardwareAddr: netIface.HardwareAddr,
+					Ip: ip,
+				};
+				rst = append(rst, md);
+
+				// fmt.Println("" + ip.String() + "," + i.Name, i.Addresses);
 				break;
 			}
 

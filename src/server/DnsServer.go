@@ -4,9 +4,11 @@ package server
 import (
 	"fmt"
 	"net"
-	"regexp"
+	// "regexp"
 
 	"github.com/miekg/dns"
+	
+	. "control"
 )
 
 type DnsServer struct {
@@ -58,12 +60,23 @@ func GetDnsServer() *DnsServer {
 // }
 
 func (c *DnsServer) findAddr(domain string) string {
-	reg, _ := regexp.Compile(".*vcedit\\.lan");
-	if reg.Match([]byte(domain)) {
-		return "127.0.0.1";
-	} else {
-		return "";
+	mainCtl := GetMainCtl();
+	ip := mainCtl.DomainGroupStatic.Test(domain);
+	if(ip == "") {
+		ip = mainCtl.DomainGroupDynamic.Test(domain);
 	}
+	
+	if(ip == "") {
+		ip = mainCtl.DomainMacCtl.Test(domain);
+	}
+	return ip;
+
+	// reg, _ := regexp.Compile(".*vcedit\\.lan");
+	// if reg.Match([]byte(domain)) {
+	// 	return "127.0.0.1";
+	// } else {
+	// 	return "";
+	// }
 }
 
 // response dns type A

@@ -66,8 +66,8 @@ func CreateComConfig() (*ComConfig) {
 			DnsIp: "",
 			DnsPort: "53",
 			DomainMatch: "*.lan",
-			DefaultDnsServer1: "",
-			DefaultDnsServer2: "",
+			DefaultDnsServer1: "8.8.8.8",
+			DefaultDnsServer2: "114.114.114.114",
 
 			UseStaticHost: true,
 			UseDynamicHost: true,

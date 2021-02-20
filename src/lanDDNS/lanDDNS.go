@@ -166,8 +166,10 @@ func (c *LanDDNS) Run() {
 	fmt.Println("server start");
 	fmt.Println("----------------------------------");
 	
-	time.Sleep(time.Second);
-	GetMsgServer().SendOnline();
+	if(enableMngServer) {
+		time.Sleep(time.Second);
+		GetMsgServer().SendOnline();
+	}
 
 	c.WaitExit();
 }
