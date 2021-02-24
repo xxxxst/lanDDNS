@@ -13,6 +13,8 @@
 
 - data/config.ini
 
+配置文件，程序第一次启动后会自动生成。修改后需要重启程序
+
 主要修改macIp参数，将其修改为需要监听的网段
 
 ```ini
@@ -38,7 +40,7 @@ logMac            = false
 
 - host.static.txt
 
-ip域名映射表
+ip域名映射表。修改后立即更新，无需重启程序
 
 ```sh
 # [ip] [domain] [domain] ...
@@ -49,7 +51,7 @@ ip域名映射表
 
 - host.mac.txt
 
-mac域名映射表
+mac域名映射表。修改后立即更新，无需重启程序
 
 ```sh
 # [ip] [domain] [domain] ...
