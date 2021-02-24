@@ -41,8 +41,6 @@ func (c *ComTest) Run(){
 	// qus := dns.Question { Name: "#0", Qtype: dns.TypeA, Qclass: dns.ClassINET };
 	// arrQus = append(arrQus, qus);
 
-	// r, _ := dns.NewRR("vcedit.lan 3600 IN A 127.0.0.1 ");
-
 	pmsg := &dns.Msg {
 		Question: make([]dns.Question, 1),
 		Answer: make([]dns.RR, 3),

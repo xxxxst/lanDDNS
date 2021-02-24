@@ -6,6 +6,7 @@ import (
 	// "bytes"
 	"encoding/binary"
 	"net"
+	"os"
 	// "regexp"
 	// "sync"
 	"strings"
@@ -39,6 +40,8 @@ type MacArpListenServer struct {
 	// mapMacToIp map[string] uint32;
 	// mapIpToMac map[uint32] string;
 	mapMacIp *OMMap;
+	strMacLog string;
+	fileMac *os.File;
 
 	chIpData chan IpData;
 }
@@ -174,6 +177,24 @@ func (c *MacArpListenServer) setIpMac(ip uint32, mac string) {
 	// if(oldIp == nil || oldIp.(uint32) != ip) {
 	// 	fmt.Println("save:" + strIp + "," + mac);
 	// }
+	
+	md := GetComModel();
+
+	if(md.ConfigMd.Server.LogMac) {
+		oldIp := c.mapMacIp.GetVal(mac);
+		if(oldIp != ip) {
+			endl := "\r\n";
+			str := mac + " " + strIp + endl;
+			// c.strMacLog += str;
+
+			if(c.fileMac == nil) {
+				c.fileMac, _ = os.OpenFile(md.RootDir + "mac.log", os.O_WRONLY | os.O_APPEND, os.ModePerm);
+			}
+			if(c.fileMac != nil) {
+				c.fileMac.WriteString(str);
+			}
+		}
+	}
 
 	c.mapMacIp.Add(mac, ip);
 	
@@ -326,7 +347,7 @@ func (c *MacArpListenServer) writeARP(md IfaceMd) {
 			return;
 		}
 
-		// time.Sleep(1 * time.Millisecond);
+		time.Sleep(4 * time.Millisecond);
 	}
 	return;
 }

@@ -70,13 +70,6 @@ func (c *DnsServer) findAddr(domain string) string {
 		ip = mainCtl.DomainMacCtl.Test(domain);
 	}
 	return ip;
-
-	// reg, _ := regexp.Compile(".*vcedit\\.lan");
-	// if reg.Match([]byte(domain)) {
-	// 	return "127.0.0.1";
-	// } else {
-	// 	return "";
-	// }
 }
 
 // response dns type A
@@ -163,16 +156,13 @@ func (c *DnsServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	qtype := r.Question[0].Qtype;
 	// fmt.Println("aaa:", name, qtype);
 
-	// 对于A记录解析请求
-	// if qtype == dns.TypeA {
-
 	domain := name
 	if(len(domain) <= 1) {
 		c.HandleUnsupportType(w, r);
 		return;
 	}
 
-	// 去掉结尾的.
+	// .
 	if(domain[len(domain)-1] == '.') {
 		domain = domain[0 : len(domain)-1]
 	}
@@ -205,40 +195,6 @@ func (c *DnsServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		break;
 	}
 	}
-
-
-
-	// // 返回固定DNS解析
-	// reg, _ := regexp.Compile(".*vcedit\\.lan")
-	// if reg.Match([]byte(domain)) {
-	// 	fmt.Println("bbb:", domain)
-	// 	addresses = []string{"127.0.0.1"}
-	// } else {
-	// 	s.HandleUnmatched(w, r)
-	// 	return
-	// }
-
-	// // 构建返回信息
-	// m := new(dns.Msg)
-	// m.SetReply(r)
-	// m.Authoritative = true
-
-	// var dnsRR []dns.RR
-	// for _, address := range addresses {
-	// 	rr := new(dns.A)
-	// 	rr.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: uint32(ttl)}
-	// 	rr.A = net.ParseIP(address)
-	// 	dnsRR = append(dnsRR, rr)
-	// }
-	// m.Answer = dnsRR
-	// w.WriteMsg(m)
-
-
-
-	// } else {
-	// 	fmt.Println("query type not support", qtype)
-	// 	s.HandleUnmatched(w, r)
-	// }
 }
 
 func (c *DnsServer) ListenAsync(port string) error {

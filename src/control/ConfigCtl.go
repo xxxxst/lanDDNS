@@ -66,6 +66,10 @@ func (c *ConfigCtl) formatHost(text string) *DomainGroup {
 	arr := strings.Split(text, "\n");
 	for i := 0; i < len(arr); i++ {
 		str := arr[i];
+		idx := strings.Index(str, "#");
+		if(idx >= 0) {
+			str = str[0:idx];
+		}
 		if(len(str) == 0) {
 			continue;
 		}

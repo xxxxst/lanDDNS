@@ -46,12 +46,30 @@ func (c *ConfigListenServer) Run() {
 	cfgCtl.SaveHostDynamic(hostDynamicPath, mainCtl.DomainGroupDynamic);
 
 	if(md.ConfigMd.Server.UseStaticHost) {
+		path := md.ConfigDir + "host.static.txt";
+		if(!util.FileExists(path)) {
+			endl := "\r\n";
+			str := "" + endl +
+				"# [ip] [domain] [domain] ..." + endl +
+				"# domain support '*', example:" + endl +
+				"# 127.0.0.1 domain.lan www.domain.lan *.domain.lan" + endl;
+			util.SaveFileString(path, str);
+		}
 		c.watch(md.ConfigDir, "host.static.txt", func() {
 			c.updateHostStatic();
 		});
 	}
 
 	if(md.ConfigMd.Server.MacIp != "") {
+		path := md.ConfigDir + "host.mac.txt";
+		if(!util.FileExists(path)) {
+			endl := "\r\n";
+			str := "" + endl +
+				"# [mac] [domain] [domain] ..." + endl +
+				"# domain support '*', example:" + endl +
+				"# 00:00:00:aa:bb:11 domain.lan www.domain.lan *.domain.lan" + endl;
+			util.SaveFileString(path, str);
+		}
 		c.watch(md.ConfigDir, "host.mac.txt", func() {
 			c.updateHostMac();
 		});

@@ -18,6 +18,7 @@ import (
 	tag "tag"
 	. "server"
 	. "model"
+	util "util"
 )
 
 type LanDDNS struct {
@@ -84,8 +85,16 @@ func (c *LanDDNS) Run() {
 	}
 	comMd.RootDir = rootDir;
 	comMd.ConfigDir = rootDir + "data/";
+
+	os.Mkdir(comMd.ConfigDir, os.ModePerm);
 	
 	comMd.ConfigMd = GetConfigCtl().LoadConfig(comMd.ConfigDir + "config.ini");
+
+	if(comMd.ConfigMd.Server.LogMac) {
+		util.SaveFileString(rootDir + "mac.log", "");
+	} else {
+		os.Remove(rootDir + "mac.log");
+	}
 
 	GetConfigListenServer().Run();
 	GetMacArpListenServer().Run();
