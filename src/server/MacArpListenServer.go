@@ -44,6 +44,7 @@ type MacArpListenServer struct {
 	fileMac *os.File;
 
 	chIpData chan IpData;
+	mapLicenIfaceName map[string] bool;
 }
 
 var insMacArpListenServer *MacArpListenServer = nil;
@@ -57,6 +58,7 @@ func GetMacArpListenServer() *MacArpListenServer {
 		ins.mapMacIp = CreateOMMap();
 
 		ins.chIpData = make(chan IpData, 10);
+		ins.mapLicenIfaceName = make(map[string] bool);
 
 		insMacArpListenServer = ins;
 
@@ -67,14 +69,30 @@ func GetMacArpListenServer() *MacArpListenServer {
 func (c *MacArpListenServer) Run() {
 	c.initConfig();
 
-	arr := c.findIfaces();
-	if(len(arr) == 0) {
+	if(len(c.mapAllowIp) == 0) {
 		return;
 	}
 
 	go c.goSetIpMac();
 
+	c.UpdateIface();
+
+	go c.AniUpdateIface();
+}
+
+func (c *MacArpListenServer) UpdateIface() {
+	arr := c.findIfaces();
+	// if(len(arr) == 0) {
+	// 	return;
+	// }
+
 	for i:=0; i<len(arr); i++ {
+		_,ok := c.mapLicenIfaceName[arr[i].Iface.Name];
+		if(ok){
+			continue;
+		}
+		c.mapLicenIfaceName[arr[i].Iface.Name] = true;
+
 		md := &arr[i];
 
 		numIp := binary.BigEndian.Uint32(md.Ip);
@@ -91,6 +109,16 @@ func (c *MacArpListenServer) Run() {
 	}
 
 	go c.SendArpData(arr);
+}
+
+func (c *MacArpListenServer) AniUpdateIface() {
+	ticker := time.NewTimer(time.Second * 120);
+	
+	for { select {
+		case <- ticker.C: {
+			c.UpdateIface();
+		}
+	} }
 }
 
 func (c *MacArpListenServer) initConfig() {
